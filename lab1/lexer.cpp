@@ -48,6 +48,9 @@ std::optional<Fields> LexerRec::matchJoin(yyFlexLexer& lexer, const std::string&
         return std::nullopt;
     }
     const std::string lhs = curr_ident;
+    if (JOIN != lexer.yylex()) {
+        return std::nullopt;
+    }
     if (TOKEN_IDENT != lexer.yylex()) {
         return std::nullopt;
     }

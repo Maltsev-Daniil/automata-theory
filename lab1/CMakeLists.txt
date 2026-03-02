@@ -8,4 +8,7 @@ add_executable(lab1_out
         regex.cpp
         lexer.cpp
         lex.yy.cc
+        factory.cpp
+        factory.h
+        relation.h
 )
