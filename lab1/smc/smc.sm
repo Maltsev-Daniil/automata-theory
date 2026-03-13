@@ -1,0 +1,419 @@
+%class SmcFields
+%fsmclass SmcClass
+%header smc-fields.h
+%start SmcMap::Waiting
+%map SmcMap
+%%
+Waiting
+{
+    curr_char(c: char)
+    [isspace(c)]
+        Waiting
+        {}
+
+    curr_char(c: char)
+    [c == 'c']
+        Expect_Create
+        {
+            clearBuffer();
+            pushBuffer(c);
+            setRole(Init);
+        }
+
+    curr_char(c: char)
+        Exit_Fail
+        {}
+
+    eof()
+        Waiting
+        {
+            setSuccess(false);
+        }
+}
+
+Expect_Create
+{
+    curr_char(c: char)
+    [ctxt.buffer == "create" && isspace(c)]
+        Expect_Ident
+        {
+            clearBuffer();
+        }
+
+    curr_char(c: char)
+    [ctxt.buffer.size() < 6]
+        Expect_Create
+        {
+            pushBuffer(c);
+        }
+
+    curr_char(c: char)
+        Exit_Fail
+        {}
+
+    eof()
+        Waiting
+        {
+            setSuccess(false);
+        }
+}
+
+Expect_Ident
+{
+    curr_char(c: char)
+    [ctxt.buffer.empty() && isspace(c)]
+        Expect_Ident
+        {}
+
+    curr_char(c: char)
+    [ctxt.buffer.empty() && isalpha(c)]
+        Expect_Ident
+        {
+            pushBuffer(c);
+        }
+
+    curr_char(c: char)
+    [!ctxt.buffer.empty() && (isalnum(c) || c == '.' || c == '_')]
+        Expect_Ident
+        {
+            pushBuffer(c);
+        }
+
+    curr_char(c: char)
+    [!ctxt.buffer.empty() && (isspace(c) || c == '(')]
+        Ident_Finished
+        {
+            setReconsume(true);
+        }
+
+    curr_char(c: char)
+        Exit_Fail
+        {}
+
+    eof()
+        Waiting
+        {
+            setSuccess(false);
+        }
+}
+
+Waiting_Comma
+{
+    curr_char(c: char)
+    [isspace(c)]
+        Waiting_Comma
+        {}
+
+    curr_char(c: char)
+    [c == ',']
+        List_Expect_After_Comma
+        {
+            pushAttribute(ctxt.buffer);
+            clearBuffer();
+        }
+
+    curr_char(c: char)
+        Exit_Fail
+        {}
+
+    eof()
+        Waiting
+        {
+            setSuccess(false);
+        }
+}
+
+List_Expect_Ident
+{
+    curr_char(c: char)
+    [ctxt.buffer.empty() && isspace(c)]
+        List_Expect_Ident
+        {}
+
+    curr_char(c: char)
+    [!ctxt.buffer.empty() && isspace(c)]
+        Waiting_Comma
+        {}
+
+    curr_char(c: char)
+    [ctxt.buffer.empty() && isalpha(c)]
+        List_Expect_Ident
+        {
+            pushBuffer(c);
+        }
+
+    curr_char(c: char)
+    [!ctxt.buffer.empty() && (isalnum(c) || c == '.' || c == '_')]
+        List_Expect_Ident
+        {
+            pushBuffer(c);
+        }
+
+    curr_char(c: char)
+    [!ctxt.buffer.empty() && c == ',']
+        List_Expect_After_Comma
+        {
+            pushAttribute(ctxt.buffer);
+            clearBuffer();
+        }
+
+    curr_char(c: char)
+    [!ctxt.buffer.empty() && c == ')']
+        Done
+        {
+            pushAttribute(ctxt.buffer);
+            clearBuffer();
+        }
+
+    curr_char(c: char)
+        Exit_Fail
+        {}
+
+    eof()
+        Waiting
+        {
+            setSuccess(false);
+        }
+}
+
+Waiting_Closing_Brace_or_Comma
+{
+    curr_char(c: char)
+    [isspace(c)]
+        Waiting_Closing_Brace_or_Comma
+        {}
+
+    curr_char(c: char)
+    [c == ')']
+        Done
+        {
+            pushAttribute(ctxt.buffer);
+            clearBuffer();
+        }
+
+    curr_char(c: char)
+    [c == ',']
+        List_Expect_Ident
+        {
+            pushAttribute(ctxt.buffer);
+            clearBuffer();
+        }
+
+    curr_char(c: char)
+        Exit_Fail
+        {}
+
+    eof()
+        Waiting
+        {
+            setSuccess(false);
+        }
+}
+
+List_Expect_After_Comma
+{
+    curr_char(c: char)
+    [ctxt.buffer.empty() && isspace(c)]
+        List_Expect_After_Comma
+        {}
+
+    curr_char(c: char)
+    [!ctxt.buffer.empty() && isspace(c)]
+        Waiting_Closing_Brace_or_Comma
+        {}
+
+    curr_char(c: char)
+    [ctxt.buffer.empty() && isalpha(c)]
+        List_Expect_After_Comma
+        {
+            pushBuffer(c);
+        }
+
+    curr_char(c: char)
+    [!ctxt.buffer.empty() && (isalnum(c) || c == '.' || c == '_')]
+        List_Expect_After_Comma
+        {
+            pushBuffer(c);
+        }
+
+    curr_char(c: char)
+    [!ctxt.buffer.empty() && c == ',']
+        List_Expect_Ident
+        {
+            pushAttribute(ctxt.buffer);
+            clearBuffer();
+        }
+
+    curr_char(c: char)
+    [!ctxt.buffer.empty() && c == ')']
+        Done
+        {
+            pushAttribute(ctxt.buffer);
+            clearBuffer();
+        }
+
+    curr_char(c: char)
+        Exit_Fail
+        {}
+
+    eof()
+        Waiting
+        {
+            setSuccess(false);
+        }
+}
+
+Ident_Finished
+{
+    curr_char(c: char)
+    [isspace(c) && ctxt.role == Rhs]
+        Done
+        {
+            setJoinRhs(ctxt.buffer);
+        }
+
+    curr_char(c: char)
+    [isspace(c)]
+        Ident_Finished
+        {}
+
+    curr_char(c: char)
+    [c == '(' && ctxt.role == Init]
+        List_Expect_Ident
+        {
+            setName(ctxt.buffer);
+            clearBuffer();
+            setRole(Att);
+            setType(Type::create);
+        }
+
+    curr_char(c: char)
+    [c == ')' && ctxt.role == Att]
+        Done
+        {
+            pushAttribute(ctxt.buffer);
+            clearBuffer();
+        }
+
+    curr_char(c:char)
+    [c == 'a' && ctxt.role == Init]
+        Expect_As
+        {
+            setName(ctxt.buffer);
+            setRole(Lhs);
+            setType(Type::join);
+            clearBuffer();
+            pushBuffer(c);
+        }
+
+    curr_char(c:char)
+    [c == 'j' && ctxt.role == Lhs]
+        Expect_Join
+        {
+            setJoinLhs(ctxt.buffer);
+            setRole(Rhs);
+            clearBuffer();
+            pushBuffer(c);
+        }
+
+    curr_char(c: char)
+        Exit_Fail
+        {}
+
+    eof()
+        Waiting
+        {
+            setSuccess(false);
+        }
+}
+
+Expect_As
+{
+    curr_char(c: char)
+    [ctxt.buffer == "as" && isspace(c)]
+        Expect_Ident
+        {
+            clearBuffer();
+        }
+
+    curr_char(c: char)
+    [ctxt.buffer.size() < 2]
+        Expect_As
+        {
+            pushBuffer(c);
+        }
+
+    curr_char(c: char)
+        Exit_Fail
+        {}
+
+    eof()
+        Waiting
+        {
+            setSuccess(false);
+        }
+}
+
+Expect_Join
+{
+    curr_char(c: char)
+    [ctxt.buffer == "join" && isspace(c)]
+        Expect_Ident
+        {
+            clearBuffer();
+        }
+
+    curr_char(c: char)
+    [ctxt.buffer.size() < 4]
+        Expect_Join
+        {
+            pushBuffer(c);
+        }
+
+    curr_char(c: char)
+        Exit_Fail
+        {}
+
+    eof()
+        Waiting
+        {
+            setSuccess(false);
+        }
+}
+
+Done
+{
+    curr_char(c: char)
+    [isspace(c)]
+        Done
+        {}
+
+    curr_char(c: char)
+        Waiting
+        {
+            setSuccess(false);
+        }
+
+    eof()
+        Waiting
+        {
+            setSuccess(true);
+        }
+}
+
+Exit_Fail
+{
+    curr_char(c: char)
+        Waiting
+        {
+            setSuccess(false);
+        }
+
+    eof()
+        Waiting
+        {
+            setSuccess(false);
+        }
+}
+
+%%

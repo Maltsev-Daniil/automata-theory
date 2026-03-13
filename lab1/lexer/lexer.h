@@ -1,5 +1,5 @@
 #pragma once
-#include "irecognizer.h"
+#include "../src/irecognizer.h"
 
 class yyFlexLexer;
 

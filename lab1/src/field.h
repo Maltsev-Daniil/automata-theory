@@ -4,7 +4,8 @@
 
 enum class Type {
     join,
-    create
+    create,
+    none
 };
 
 struct Fields {

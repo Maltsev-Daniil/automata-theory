@@ -1,11 +1,15 @@
-#include "lexer.h"
-#include "regex.h"
+#include <fstream>
+
+#include "lexer/lexer.h"
+#include "regex/regex.h"
 #include <iostream>
 #include <limits>
 #include <memory>
 #include <string>
-#include "relation.h"
-#include "factory.h"
+
+#include "smc/smc.h"
+#include "src/relation.h"
+#include "src/factory.h"
 
 void printRelations(
     const std::unordered_map<std::string,
@@ -29,6 +33,7 @@ int main() {
 
     RegexRec regex_rec;
     LexerRec lexer_rec;
+    SmcRec smc_rec;
 
     while (true) {
         std::cout << "\n===== MENU =====\n";
@@ -72,7 +77,12 @@ int main() {
             }
         }
         else if (input_mode == '2') {
-            std::cout << "// file input not implemented yet\n";
+            std::cout << "Enter file name:\n";
+            std::getline(std::cin, input);
+            std::ifstream file(input);
+            // считываем только одну строку с файла
+            std::getline(file, input);
+            file.close();
             continue;
         }
         else {
@@ -89,8 +99,7 @@ int main() {
             result = lexer_rec.process(input);
         }
         else if (process_mode == '3') {
-            std::cout << "// smc not implemented yet\n";
-            continue;
+            result = smc_rec.process(input);
         }
         else {
             std::cout << "Error: invalid processor\n";
@@ -103,7 +112,7 @@ int main() {
                 relations.insert({relation->name, std::move(relation)});
             }
         } else {
-            std::cout << "Error: invalid relations\n";
+            std::cout << "Error: nullopt in Fields\n";
         }
 
         printRelations(relations);

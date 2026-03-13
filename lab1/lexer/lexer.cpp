@@ -4,8 +4,8 @@
 #include "lexer.h"
 #include <vector>
 #include <string>
-#include "field.h"
-#include "tokens.h"
+#include "../src/field.h"
+#include "../src/tokens.h"
 #include <sstream>
 
 #include <FlexLexer.h>

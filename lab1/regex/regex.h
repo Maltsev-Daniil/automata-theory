@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "irecognizer.h"
+#include "../src/irecognizer.h"
 
 class RegexRec : public IRecognizer {
     public:

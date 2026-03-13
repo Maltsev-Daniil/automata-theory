@@ -410,9 +410,9 @@ static const flex_int16_t yy_chk[55] =
 #define YY_RESTORE_YY_MORE_OFFSET
 #line 1 "lexer.l"
 #line 3 "lexer.l"
-#include "field.h"
+#include "../src/field.h"
 #include <string>
-#include "tokens.h"
+#include "../src/tokens.h"
 
 std::string curr_ident{};
 #line 419 "lex.yy.cc"
