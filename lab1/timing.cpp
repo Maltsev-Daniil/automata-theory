@@ -34,7 +34,7 @@ int main() {
     }
 
     std::string line;
-    const int runs = 250;
+    const int runs = 50;
 
     // прогрев
     regex_rec.process("create a(b,c)");

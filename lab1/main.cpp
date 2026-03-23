@@ -5,6 +5,7 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <sstream>
 #include <string>
 
 #include "smc/smc.h"
@@ -73,46 +74,67 @@ int main() {
             while (std::getline(std::cin, line)) {
                 if (line.empty())
                     break;
-                input += line;
+                input += line + '\n';
             }
         }
         else if (input_mode == '2') {
             std::cout << "Enter file name:\n";
-            std::getline(std::cin, input);
+            if (!std::getline(std::cin, input) || input.empty()) {
+                std::cerr << "Error: invalid file name\n";
+                continue;
+            }
             std::ifstream file(input);
-            // считываем только одну строку с файла
-            std::getline(file, input);
+            if (!file.is_open()) {
+                std::cerr << "Error: cannot open file\n";
+                continue;
+            }
+            std::string line;
+            input.clear();
+            while (std::getline(file, line)) {
+                if (line.empty())
+                    break;
+                input += line + '\n';
+            }
             file.close();
-            continue;
         }
         else {
             std::cout << "Error: invalid input source\n";
             continue;
         }
 
-        std::optional<Fields> result;
+        std::istringstream iss(input);
+        std::string command;
 
-        if (process_mode == '1') {
-            result = regex_rec.process(input);
-        }
-        else if (process_mode == '2') {
-            result = lexer_rec.process(input);
-        }
-        else if (process_mode == '3') {
-            result = smc_rec.process(input);
-        }
-        else {
-            std::cout << "Error: invalid processor\n";
-            continue;
-        }
+        while (std::getline(iss, command)) {
+            if (command.empty())
+                continue;
 
-        if (result.has_value()) {
-            auto relation = factory.createRelation(result.value());
-            if (relation) {
-                relations.insert({relation->name, std::move(relation)});
+            std::optional<Fields> result;
+
+            if (process_mode == '1') {
+                result = regex_rec.process(command);
             }
-        } else {
-            std::cout << "Error: nullopt in Fields\n";
+            else if (process_mode == '2') {
+                result = lexer_rec.process(command);
+            }
+            else if (process_mode == '3') {
+                result = smc_rec.process(command);
+            }
+            else {
+                std::cout << "Error: invalid processor\n";
+                break;
+            }
+
+            if (result.has_value()) {
+                auto relation = factory.createRelation(result.value());
+                if (relation) {
+                    relations.insert({relation->name, std::move(relation)});
+                } else {
+                    std::cout << "Error: logical error in input\n";
+                }
+            } else {
+                std::cout << "Error: nullopt in Fields: " << command << "\n";
+            }
         }
 
         printRelations(relations);
