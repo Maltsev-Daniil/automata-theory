@@ -2,7 +2,6 @@ package synttree
 
 import (
 	"errors"
-	"fmt"
 	"unicode"
 )
 
@@ -69,7 +68,7 @@ func expectRepeat(str string, i int) (res string, new_i int, err error) {
 			if len(res) == 0 {
 				return "", i, errors.New("expect_repeat: no repeat value was given")
 			}
-			return res, j + 1, nil
+			return res, j, nil
 		} else if unicode.IsDigit(rune(str[j])) {
 			res += string(str[j])
 		} else {
@@ -80,17 +79,10 @@ func expectRepeat(str string, i int) (res string, new_i int, err error) {
 }
 
 func expectKlini(str string, i int) (res string, new_i int, err error) {
-	count := 0
-	for j := i + 1; j < len(str); j++ {
-		if str[j] != '.' && count == 2 {
-			return "...", j + 1, nil
-		} else if str[j] == '.' {
-			count++
-		} else {
-			return "", i, errors.New("expect_klini: invalid character in klini value")
-		}
-	}
-	return "", i, errors.New("expect_klini: klini is not valid, expected '...'")
+    if i+2 < len(str) && str[i+1] == '.' && str[i+2] == '.' {
+        return "...", i + 2, nil // Возвращаем i+2, после i++ в tokenize индекс станет i+3
+    }
+    return "", i, errors.New("expect_klini: klini is not valid, expected '...'")
 }
 
 func expectCaptureGroup(str string, i int) (res string, new_i int, err error) {
@@ -99,7 +91,7 @@ func expectCaptureGroup(str string, i int) (res string, new_i int, err error) {
 			if len(res) == 0 {
 				return "", i, errors.New("expect_capture_group: no capture group name was given")
 			}
-			return res, j + 1, nil
+			return res, j, nil
 		} else {
 			res += string(str[j])
 		}
@@ -218,7 +210,7 @@ func makeNode(op Token, node_stack *[]*Node) (*Node, error) {
 	// 2 children
 	case OP_CONC, OP_OR:
 		if len(*node_stack) < 2 {
-			return nil, fmt.Errorf("make_node: not enough operands for binary operator")
+			return nil, errors.New("make_node: not enough operands for binary operator")
 		}
 
 		right := popNode(node_stack)
@@ -231,9 +223,9 @@ func makeNode(op Token, node_stack *[]*Node) (*Node, error) {
 		right.parent = node
 
 	// 1 child
-	case OP_KLINI, OP_QUESTION, OP_REPEAT, CAPTURE_GROUP:
+	case OP_KLINI, OP_QUESTION, OP_REPEAT:
 		if len(*node_stack) < 1 {
-			return nil, fmt.Errorf("make_node: not enough operands for unary operator")
+			return nil, errors.New("make_node: not enough operands for unary operator")
 		}
 
 		child := popNode(node_stack)
@@ -241,8 +233,13 @@ func makeNode(op Token, node_stack *[]*Node) (*Node, error) {
 		node.left = child
 		child.parent = node
 
+	case CAPTURE_GROUP:
+		// capture group — это не оператор, он уже обрабатывается при построении дерева, так что сюда он не должен попадать
+		// должно быть unreachable
+		return nil, errors.New("make_node: capture group doesn't support referencing")
+
 	default:
-		return nil, fmt.Errorf("make_node: unknown operator type")
+		return nil, errors.New("make_node: unknown operator type")
 	}
 
 	return node, nil
@@ -259,6 +256,9 @@ func buildTree(tokens []Token) (Tree, error) {
 		if token.type_token == LITERAL {
 			stack_nodes = append(stack_nodes, &Node{type_node: LITERAL, value: token.value})
 			continue
+		} else if token.type_token == CAPTURE_GROUP {
+			stack_ops = append(stack_ops, token)
+			continue
 		}
 		if len(stack_ops) == 0 || token.type_token == LEFT_PAR {
 			stack_ops = append(stack_ops, token)
@@ -269,6 +269,19 @@ func buildTree(tokens []Token) (Tree, error) {
 				}
 				top := popToken(&stack_ops)
 				if top.type_token == LEFT_PAR {
+					break
+				} else if top.type_token == CAPTURE_GROUP {
+					if peekToken(&stack_ops).type_token != LEFT_PAR {
+						return Tree{}, errors.New("build_tree: capture group must be immediately after left parenthesis")
+					}
+					expr := popNode(&stack_nodes)
+					if expr == nil {
+						return Tree{}, errors.New("build_tree: no expression found for capture group")
+					}
+					name_node := &Node{type_node: CAPTURE_GROUP, value: top.value, left: expr}
+					expr.parent = name_node
+					stack_nodes = append(stack_nodes, name_node)
+					popToken(&stack_ops)
 					break
 				}
 				node, err := makeNode(top, &stack_nodes)
