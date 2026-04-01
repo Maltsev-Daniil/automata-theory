@@ -2,10 +2,12 @@ package synttree
 
 import (
 	"errors"
+	"strconv"
 	"unicode"
 )
 
 type TypeNode int
+
 const (
 	LEFT_PAR TypeNode = iota
 	RIGHT_PAR
@@ -16,18 +18,19 @@ const (
 	OP_OR
 	CAPTURE_GROUP
 	LITERAL
+	SHEBANG
 )
 
 type Node struct {
-	type_node TypeNode
-	value string
-	left *Node
-	right *Node
-	parent *Node	
+	Type_node TypeNode
+	Value     string
+	Left      *Node
+	Right     *Node
+	Parent    *Node
 }
 
 type Tree struct {
-	root *Node
+	Root *Node
 }
 
 func popToken(stack *[]Token) Token {
@@ -56,11 +59,11 @@ func popNode(stack *[]*Node) *Node {
 }
 
 type Token struct {
-	value string
+	value      string
 	type_token TypeNode
 }
 
-// работаем с байтами а не рунами, но не критично тк 
+// работаем с байтами а не рунами, но не критично тк
 // на вход допустимы только цифры и {}
 func expectRepeat(str string, i int) (res string, new_i int, err error) {
 	for j := i + 1; j < len(str); j++ {
@@ -79,10 +82,10 @@ func expectRepeat(str string, i int) (res string, new_i int, err error) {
 }
 
 func expectKlini(str string, i int) (res string, new_i int, err error) {
-    if i+2 < len(str) && str[i+1] == '.' && str[i+2] == '.' {
-        return "...", i + 2, nil // Возвращаем i+2, после i++ в tokenize индекс станет i+3
-    }
-    return "", i, errors.New("expect_klini: klini is not valid, expected '...'")
+	if i+2 < len(str) && str[i+1] == '.' && str[i+2] == '.' {
+		return "...", i + 2, nil // Возвращаем i+2, после i++ в tokenize индекс станет i+3
+	}
+	return "", i, errors.New("expect_klini: klini is not valid, expected '...'")
 }
 
 func expectCaptureGroup(str string, i int) (res string, new_i int, err error) {
@@ -141,10 +144,10 @@ func tokenize(str string) (result []Token, err error) {
 func canBeLeftFromConc(token Token) bool {
 	switch token.type_token {
 	case LITERAL,
-	     RIGHT_PAR,
-	     OP_KLINI,
-	     OP_QUESTION,
-	     OP_REPEAT:
+		RIGHT_PAR,
+		OP_KLINI,
+		OP_QUESTION,
+		OP_REPEAT:
 		return true
 	}
 	return false
@@ -152,10 +155,10 @@ func canBeLeftFromConc(token Token) bool {
 
 func canBeRightFromConc(token Token) bool {
 	switch token.type_token {
-		case LITERAL,
-			 LEFT_PAR,
-			 CAPTURE_GROUP:
-			return true
+	case LITERAL,
+		LEFT_PAR,
+		CAPTURE_GROUP:
+		return true
 	}
 	return false
 }
@@ -164,9 +167,9 @@ func addConcat(tokens []Token) (result []Token, err error) {
 	if len(tokens) == 0 {
 		return nil, nil
 	}
-	for i := 0; i < len(tokens) - 1; i++ {
+	for i := 0; i < len(tokens)-1; i++ {
 		result = append(result, tokens[i])
-		if canBeLeftFromConc(tokens[i]) && canBeRightFromConc(tokens[i + 1]) {
+		if canBeLeftFromConc(tokens[i]) && canBeRightFromConc(tokens[i+1]) {
 			result = append(result, Token{value: "+", type_token: OP_CONC})
 		}
 	}
@@ -190,19 +193,40 @@ func precedence(op TypeNode) int {
 func isOperator(token Token) bool {
 	switch token.type_token {
 	case OP_KLINI,
-	     OP_CONC,
-	     OP_QUESTION,
-	     OP_REPEAT,
-	     OP_OR:
+		OP_CONC,
+		OP_QUESTION,
+		OP_REPEAT,
+		OP_OR:
 		return true
 	}
 	return false
 }
 
+func cloneSubtree(node *Node) *Node {
+	if node == nil {
+		return nil
+	}
+	new_node := &Node{
+		Type_node: node.Type_node,
+		Value:     node.Value,
+	}
+	new_node.Left = cloneSubtree(node.Left)
+	new_node.Right = cloneSubtree(node.Right)
+
+	if new_node.Left != nil {
+		new_node.Left.Parent = new_node
+	}
+	if new_node.Right != nil {
+		new_node.Right.Parent = new_node
+	}
+
+	return new_node
+}
+
 func makeNode(op Token, node_stack *[]*Node) (*Node, error) {
 	node := &Node{
-		type_node: op.type_token,
-		value: op.value,
+		Type_node: op.type_token,
+		Value:     op.value,
 	}
 
 	switch op.type_token {
@@ -216,22 +240,53 @@ func makeNode(op Token, node_stack *[]*Node) (*Node, error) {
 		right := popNode(node_stack)
 		left := popNode(node_stack)
 
-		node.left = left
-		node.right = right
+		node.Left = left
+		node.Right = right
 
-		left.parent = node
-		right.parent = node
+		left.Parent = node
+		right.Parent = node
 
 	// 1 child
-	case OP_KLINI, OP_QUESTION, OP_REPEAT:
+	case OP_KLINI, OP_QUESTION:
 		if len(*node_stack) < 1 {
 			return nil, errors.New("make_node: not enough operands for unary operator")
 		}
 
 		child := popNode(node_stack)
 
-		node.left = child
-		child.parent = node
+		node.Left = child
+		child.Parent = node
+
+	// в драгон буке в алгоритме не используется
+	// that's why we unfold it
+	case OP_REPEAT:
+		if len(*node_stack) < 1 {
+			return nil, errors.New("make_node: not enough operands for repeat operator")
+		}
+
+		child := popNode(node_stack)
+
+		repeat, _ := strconv.Atoi(op.value)
+		if repeat < 1 {
+			return nil, errors.New("make_node: repeat value must be greater than 0")
+		}
+
+		result := cloneSubtree(child)
+
+		for i := 1; i < repeat; i++ {
+			next_clone := cloneSubtree(child)
+			new_conc_node := &Node{
+				Type_node: OP_CONC,
+				Value:     "+",
+				Left:      result,
+				Right:     next_clone,
+			}
+			result.Parent = new_conc_node
+			next_clone.Parent = new_conc_node
+			result = new_conc_node // переставляем указатель
+		}
+
+		node = result
 
 	case CAPTURE_GROUP:
 		// capture group — это не оператор, он уже обрабатывается при построении дерева, так что сюда он не должен попадать
@@ -246,7 +301,7 @@ func makeNode(op Token, node_stack *[]*Node) (*Node, error) {
 }
 
 func buildTree(tokens []Token) (Tree, error) {
-	tokens = append([]Token{Token{"(", LEFT_PAR}}, tokens...)	
+	tokens = append([]Token{Token{"(", LEFT_PAR}}, tokens...)
 	tokens = append(tokens, Token{")", RIGHT_PAR})
 
 	var stack_ops []Token
@@ -254,7 +309,7 @@ func buildTree(tokens []Token) (Tree, error) {
 
 	for _, token := range tokens {
 		if token.type_token == LITERAL {
-			stack_nodes = append(stack_nodes, &Node{type_node: LITERAL, value: token.value})
+			stack_nodes = append(stack_nodes, &Node{Type_node: LITERAL, Value: token.value})
 			continue
 		} else if token.type_token == CAPTURE_GROUP {
 			stack_ops = append(stack_ops, token)
@@ -278,8 +333,8 @@ func buildTree(tokens []Token) (Tree, error) {
 					if expr == nil {
 						return Tree{}, errors.New("build_tree: no expression found for capture group")
 					}
-					name_node := &Node{type_node: CAPTURE_GROUP, value: top.value, left: expr}
-					expr.parent = name_node
+					name_node := &Node{Type_node: CAPTURE_GROUP, Value: top.value, Left: expr}
+					expr.Parent = name_node
 					stack_nodes = append(stack_nodes, name_node)
 					popToken(&stack_ops)
 					break
@@ -307,11 +362,18 @@ func buildTree(tokens []Token) (Tree, error) {
 	if len(stack_nodes) != 1 {
 		return Tree{}, errors.New("build_tree: invalid expression, more than one node left in stack")
 	}
-	return Tree{root: stack_nodes[0]}, nil
+	return Tree{Root: stack_nodes[0]}, nil
 }
 
-func process(input string) (Tree, error) {
-	tokens, err := tokenize(input)	
+func addShebang(tree *Tree) {
+	var far_right *Node
+	for far_right = tree.Root; far_right.Right != nil; far_right = far_right.Right {
+	}
+	far_right.Right = &Node{Type_node: SHEBANG, Value: "#"}
+}
+
+func stringToTree(input string) (Tree, error) {
+	tokens, err := tokenize(input)
 	if err != nil {
 		return Tree{}, err
 	}
@@ -323,5 +385,9 @@ func process(input string) (Tree, error) {
 	if err != nil {
 		return Tree{}, err
 	}
+
+	// we should add shebang for a non nfa algorithm
+	addShebang(&tree)
+
 	return tree, nil
 }
