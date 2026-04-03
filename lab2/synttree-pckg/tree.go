@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strconv"
 	"unicode"
+	"unicode/utf8"
 )
 
 type TypeNode int
@@ -89,17 +90,30 @@ func expectKlini(str string, i int) (res string, new_i int, err error) {
 }
 
 func expectCaptureGroup(str string, i int) (res string, new_i int, err error) {
-	for j := i + 1; j < len(str); j++ {
+	for j := i + 1; j < len(str); {
 		if str[j] == '>' {
 			if len(res) == 0 {
 				return "", i, errors.New("expect_capture_group: no capture group name was given")
 			}
 			return res, j, nil
-		} else {
-			res += string(str[j])
 		}
+		r, size := utf8.DecodeRuneInString(str[j:])
+		res += string(r)
+		j += size
 	}
 	return "", i, errors.New("expect_capture_group: no closing > was given")
+}
+
+func expectEscape(str string, i int) (res string, new_i int, err error) {
+	if i+1 >= len(str) {
+		return "", i, errors.New("expect_escape: no escaped character was given")
+	}
+	r, size := utf8.DecodeRuneInString(str[i+1:])
+	closePos := i + 1 + size
+	if closePos >= len(str) || str[closePos] != '%' {
+		return "", i, errors.New("expect_escape: escape is not valid, expected closing '%'")
+	}
+	return string(r), closePos, nil
 }
 
 func tokenize(str string) (result []Token, err error) {
@@ -134,8 +148,17 @@ func tokenize(str string) (result []Token, err error) {
 			}
 			i = new_i
 			result = append(result, Token{value: el, type_token: CAPTURE_GROUP})
+		case '%':
+			el, new_i, err := expectEscape(str, i)
+			if err != nil {
+				return nil, err
+			}
+			i = new_i
+			result = append(result, Token{value: el, type_token: LITERAL})
 		default:
-			result = append(result, Token{value: string(str[i]), type_token: LITERAL})
+			r, size := utf8.DecodeRuneInString(str[i:])
+			result = append(result, Token{value: string(r), type_token: LITERAL})
+			i += size - 1
 		}
 	}
 	return result, nil
