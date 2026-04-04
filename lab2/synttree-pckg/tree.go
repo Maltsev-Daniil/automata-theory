@@ -388,13 +388,6 @@ func buildTree(tokens []Token) (Tree, error) {
 	return Tree{Root: stack_nodes[0]}, nil
 }
 
-func addShebang(tree *Tree) {
-	var far_right *Node
-	for far_right = tree.Root; far_right.Right != nil; far_right = far_right.Right {
-	}
-	far_right.Right = &Node{Type_node: SHEBANG, Value: "#"}
-}
-
 func stringToTree(input string) (Tree, error) {
 	tokens, err := tokenize(input)
 	if err != nil {
@@ -408,9 +401,6 @@ func stringToTree(input string) (Tree, error) {
 	if err != nil {
 		return Tree{}, err
 	}
-
-	// we should add shebang for a non nfa algorithm
-	addShebang(&tree)
 
 	return tree, nil
 }

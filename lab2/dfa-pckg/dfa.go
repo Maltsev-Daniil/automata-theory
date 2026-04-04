@@ -5,13 +5,13 @@ import (
 	synttree "reglib/synttree-pckg"
 )
 
-type set map[uint]struct{}
+type set map[int]struct{}
 
 type DFA struct {
 	alphabet      map[string]struct{}
 	dstates       []set
-	dtran         map[uint]map[string]uint
-	start_state   uint
+	dtran         map[int]map[string]int
+	start_state   int
 	accept_states set
 }
 
@@ -32,7 +32,7 @@ func mergeSets(a, b set) set {
 	return result
 }
 
-func calcInfoNodes(node *synttree.Node, info_nodes map[*synttree.Node]*InfoNodes, pos_to_literal map[uint]string, pos *uint) {
+func calcInfoNodes(node *synttree.Node, info_nodes map[*synttree.Node]*InfoNodes, pos_to_literal map[int]string, pos *int) {
 	if node == nil {
 		return
 	}
@@ -43,8 +43,8 @@ func calcInfoNodes(node *synttree.Node, info_nodes map[*synttree.Node]*InfoNodes
 	case synttree.LITERAL, synttree.SHEBANG:
 		info_nodes[node] = &InfoNodes{
 			nullable: false,
-			firstpos: map[uint]struct{}{*pos: {}},
-			lastpos:  map[uint]struct{}{*pos: {}},
+			firstpos: map[int]struct{}{*pos: {}},
+			lastpos:  map[int]struct{}{*pos: {}},
 		}
 		pos_to_literal[*pos] = node.Value
 		*pos++
@@ -102,7 +102,7 @@ func calcInfoNodes(node *synttree.Node, info_nodes map[*synttree.Node]*InfoNodes
 	}
 }
 
-func cycleForFollowPos(from set, to set, follow_pos map[uint]set) {
+func cycleForFollowPos(from set, to set, follow_pos map[int]set) {
 	for i := range from {
 		if follow_pos[i] == nil {
 			follow_pos[i] = make(set)
@@ -116,7 +116,7 @@ func cycleForFollowPos(from set, to set, follow_pos map[uint]set) {
 	}
 }
 
-func calcFollowPos(root *synttree.Node, info_nodes map[*synttree.Node]*InfoNodes, follow_pos map[uint]set) {
+func calcFollowPos(root *synttree.Node, info_nodes map[*synttree.Node]*InfoNodes, follow_pos map[int]set) {
 	if root == nil {
 		return
 	}
@@ -172,12 +172,22 @@ func findState(dstates []set, trans_by_lit set) int {
 	return -1
 }
 
+func addShebang(tree *synttree.Tree) {
+	var far_right *synttree.Node
+	for far_right = tree.Root; far_right.Right != nil; far_right = far_right.Right {
+	}
+	far_right.Right = &synttree.Node{Type_node: synttree.SHEBANG, Value: "#"}
+}
+
 func treeToDFA(tree *synttree.Tree) *DFA {
+	// we should add shebang for this algorithm
+	addShebang(tree)
+
 	info_nodes := make(map[*synttree.Node]*InfoNodes)
-	follow_pos := make(map[uint]set)
-	pos_to_literal := make(map[uint]string)
+	follow_pos := make(map[int]set)
+	pos_to_literal := make(map[int]string)
 	alphabet := make(map[string]struct{})
-	var pos uint = 0
+	pos := 0
 
 	calcInfoNodes(tree.Root, info_nodes, pos_to_literal, &pos)
 	calcFollowPos(tree.Root, info_nodes, follow_pos)
@@ -185,18 +195,18 @@ func treeToDFA(tree *synttree.Tree) *DFA {
 
 	// слайс сетов
 	dstates := []set{}
-	marked := make(map[uint]bool)
-	dtran := make(map[uint]map[string]uint)
+	marked := make(map[int]bool)
+	dtran := make(map[int]map[string]int)
 
 	dstates = append(dstates, info_nodes[tree.Root].firstpos)
 	marked[0] = false
 
 	for {
-		var non_marked_id uint = 0
+		non_marked_id := 0
 		found := false
 		for id := range dstates {
-			if !marked[uint(id)] {
-				non_marked_id = uint(id)
+			if !marked[id] {
+				non_marked_id = id
 				found = true
 				break
 			}
@@ -224,33 +234,36 @@ func treeToDFA(tree *synttree.Tree) *DFA {
 				dstates = append(dstates, trans_by_lit)
 				// выдаем уникальный айди
 				equ_id = len(dstates) - 1
-				marked[uint(equ_id)] = false
+				marked[equ_id] = false
 			}
 			if dtran[non_marked_id] == nil {
-				dtran[non_marked_id] = make(map[string]uint)
+				dtran[non_marked_id] = make(map[string]int)
 			}
-			dtran[non_marked_id][literal] = uint(equ_id)
+			dtran[non_marked_id][literal] = equ_id
 		}
 	}
 
 	// building dead_states
 	dead_id := len(dstates)
+	if dtran[dead_id] == nil {
+		dtran[dead_id] = make(map[string]int)
+	}
 	for state_id := range dstates {
-		if dtran[uint(dead_id)] == nil {
-			dtran[uint(dead_id)] = make(map[string]uint)
+		if dtran[state_id] == nil {
+			dtran[state_id] = make(map[string]int)
 		}
 		for lit := range alphabet {
-			if _, ok := dtran[uint(state_id)][lit]; !ok {
-				dtran[uint(state_id)][lit] = uint(dead_id)
+			if _, ok := dtran[state_id][lit]; !ok {
+				dtran[state_id][lit] = dead_id
 			}
 		}
 	}
 	for lit := range alphabet {
-		dtran[uint(dead_id)][lit] = uint(dead_id)
+		dtran[dead_id][lit] = dead_id
 	}
 
 	// building accept_states
-	var hash_pos uint
+	hash_pos := 0
 	for p, lit := range pos_to_literal {
 		if lit == "#" {
 			hash_pos = p
@@ -261,7 +274,7 @@ func treeToDFA(tree *synttree.Tree) *DFA {
 	accept_states := make(set)
 	for id, state := range dstates {
 		if _, ok := state[hash_pos]; ok {
-			accept_states[uint(id)] = struct{}{}
+			accept_states[id] = struct{}{}
 		}
 	}
 

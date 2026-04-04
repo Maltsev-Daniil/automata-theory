@@ -178,7 +178,6 @@ func TestBuildTree(t *testing.T) {
 
 	var assertNode func(t *testing.T, got *Node, want *expectedNode)
 	assertNode = func(t *testing.T, got *Node, want *expectedNode) {
-		t.Helper()
 		if want == nil {
 			if got != nil {
 				t.Fatalf("expected nil node, got %v (%q)", got.Type_node, got.Value)
