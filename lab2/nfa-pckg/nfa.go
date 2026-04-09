@@ -5,25 +5,25 @@ import (
 	"reglib/synttree-pckg"
 )
 
-type epsilon_tran struct {
-	to  *state
+type Epsilon_tran struct {
+	To  *State
 	cap *cap_event // nil if none
 }
 type cap_event struct {
 	name   string
 	finish bool // 0 - start; 1 - finish
 }
-type state struct {
-	id      int
-	ntran   map[string][]*state
-	epsilon []epsilon_tran
+type State struct {
+	Id      int
+	Ntran   map[string][]*State
+	Epsilon []Epsilon_tran
 }
 type NfaNode struct {
-	start  *state
-	finish *state
+	Start  *State
+	Finish *State
 }
 type NFA struct {
-	head NfaNode
+	Head NfaNode
 
 	group_order []string
 	name_to_id  map[string]int
@@ -33,122 +33,122 @@ var state_id int
 var group_order []string
 var name_to_id map[string]int
 
-func genNewState() *state {
-	s := &state{
-		id:      state_id,
-		ntran:   make(map[string][]*state),
-		epsilon: make([]epsilon_tran, 0),
+func GenNewState() *State {
+	s := &State{
+		Id:      state_id,
+		Ntran:   make(map[string][]*State),
+		Epsilon: make([]Epsilon_tran, 0),
 	}
 	state_id++
 	return s
 }
 
 func buildLiteral(lit string) NfaNode {
-	s := genNewState()
-	f := genNewState()
-	s.ntran[lit] = []*state{f}
+	s := GenNewState()
+	f := GenNewState()
+	s.Ntran[lit] = []*State{f}
 	return NfaNode{
-		start:  s,
-		finish: f,
+		Start:  s,
+		Finish: f,
 	}
 }
 
 func buildConc(lhs, rhs NfaNode) NfaNode {
-	lhs.finish.epsilon = append(lhs.finish.epsilon, epsilon_tran{
-		to:  rhs.start,
+	lhs.Finish.Epsilon = append(lhs.Finish.Epsilon, Epsilon_tran{
+		To:  rhs.Start,
 		cap: nil,
 	})
 	return NfaNode{
-		lhs.start,
-		rhs.finish,
+		lhs.Start,
+		rhs.Finish,
 	}
 }
 
 func buildOr(lhs, rhs NfaNode) NfaNode {
-	new_s := genNewState()
-	new_f := genNewState()
+	new_s := GenNewState()
+	new_f := GenNewState()
 
-	new_s.epsilon = append(new_s.epsilon, epsilon_tran{
-		to:  lhs.start,
+	new_s.Epsilon = append(new_s.Epsilon, Epsilon_tran{
+		To:  lhs.Start,
 		cap: nil,
 	})
-	new_s.epsilon = append(new_s.epsilon, epsilon_tran{
-		to:  rhs.start,
+	new_s.Epsilon = append(new_s.Epsilon, Epsilon_tran{
+		To:  rhs.Start,
 		cap: nil,
 	})
 
-	lhs.finish.epsilon = append(lhs.finish.epsilon, epsilon_tran{
-		to:  new_f,
+	lhs.Finish.Epsilon = append(lhs.Finish.Epsilon, Epsilon_tran{
+		To:  new_f,
 		cap: nil,
 	})
-	rhs.finish.epsilon = append(rhs.finish.epsilon, epsilon_tran{
-		to:  new_f,
+	rhs.Finish.Epsilon = append(rhs.Finish.Epsilon, Epsilon_tran{
+		To:  new_f,
 		cap: nil,
 	})
 
 	return NfaNode{
-		start:  new_s,
-		finish: new_f,
+		Start:  new_s,
+		Finish: new_f,
 	}
 }
 
 func buildKlini(node NfaNode) NfaNode {
-	new_s := genNewState()
-	new_f := genNewState()
+	new_s := GenNewState()
+	new_f := GenNewState()
 
-	new_s.epsilon = append(new_s.epsilon, epsilon_tran{
-		to:  node.start,
+	new_s.Epsilon = append(new_s.Epsilon, Epsilon_tran{
+		To:  node.Start,
 		cap: nil,
 	})
-	new_s.epsilon = append(new_s.epsilon, epsilon_tran{
-		to:  new_f,
+	new_s.Epsilon = append(new_s.Epsilon, Epsilon_tran{
+		To:  new_f,
 		cap: nil,
 	})
 
-	node.finish.epsilon = append(node.finish.epsilon, epsilon_tran{
-		to:  new_f,
+	node.Finish.Epsilon = append(node.Finish.Epsilon, Epsilon_tran{
+		To:  new_f,
 		cap: nil,
 	})
-	node.finish.epsilon = append(node.finish.epsilon, epsilon_tran{
-		to:  node.start,
+	node.Finish.Epsilon = append(node.Finish.Epsilon, Epsilon_tran{
+		To:  node.Start,
 		cap: nil,
 	})
 
 	return NfaNode{
-		start:  new_s,
-		finish: new_f,
+		Start:  new_s,
+		Finish: new_f,
 	}
 }
 
 func buildOptional(node NfaNode) NfaNode {
-	new_s := genNewState()
-	new_f := genNewState()
+	new_s := GenNewState()
+	new_f := GenNewState()
 
-	new_s.epsilon = append(new_s.epsilon, epsilon_tran{
-		to:  node.start,
+	new_s.Epsilon = append(new_s.Epsilon, Epsilon_tran{
+		To:  node.Start,
 		cap: nil,
 	})
-	new_s.epsilon = append(new_s.epsilon, epsilon_tran{
-		to:  new_f,
+	new_s.Epsilon = append(new_s.Epsilon, Epsilon_tran{
+		To:  new_f,
 		cap: nil,
 	})
 
-	node.finish.epsilon = append(node.finish.epsilon, epsilon_tran{
-		to:  new_f,
+	node.Finish.Epsilon = append(node.Finish.Epsilon, Epsilon_tran{
+		To:  new_f,
 		cap: nil,
 	})
 
 	return NfaNode{
-		start:  new_s,
-		finish: new_f,
+		Start:  new_s,
+		Finish: new_f,
 	}
 }
 
 func buildCapture(node *synttree.Node) NfaNode {
 	child := buildNFA(node.Left)
 
-	new_s := genNewState()
-	new_f := genNewState()
+	new_s := GenNewState()
+	new_f := GenNewState()
 
 	// чтобы можно было по айди находить
 	if name_to_id == nil {
@@ -159,22 +159,22 @@ func buildCapture(node *synttree.Node) NfaNode {
 		group_order = append(group_order, node.Value)
 	}
 
-	new_s.epsilon = append(new_s.epsilon, epsilon_tran{
-		to: child.start,
+	new_s.Epsilon = append(new_s.Epsilon, Epsilon_tran{
+		To: child.Start,
 		cap: &cap_event{
 			name:   node.Value,
 			finish: false,
 		},
 	})
-	child.finish.epsilon = append(child.finish.epsilon, epsilon_tran{
-		to: new_f,
+	child.Finish.Epsilon = append(child.Finish.Epsilon, Epsilon_tran{
+		To: new_f,
 		cap: &cap_event{
 			name:   node.Value,
 			finish: true,
 		}})
 	return NfaNode{
-		start:  new_s,
-		finish: new_f,
+		Start:  new_s,
+		Finish: new_f,
 	}
 }
 

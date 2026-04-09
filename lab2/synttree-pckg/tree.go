@@ -388,7 +388,7 @@ func buildTree(tokens []Token) (Tree, error) {
 	return Tree{Root: stack_nodes[0]}, nil
 }
 
-func stringToTree(input string) (Tree, error) {
+func StringToTree(input string) (Tree, error) {
 	tokens, err := tokenize(input)
 	if err != nil {
 		return Tree{}, err

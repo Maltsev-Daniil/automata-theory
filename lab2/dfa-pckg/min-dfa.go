@@ -153,7 +153,6 @@ func DfaToMinDFA(dfa *DFA) *MinDFA {
 
 	start := state_to_group[dfa.start_state]
 
-	// 4. новые accepting
 	accept := make(map[int]struct{})
 
 	for i, group := range mstates {

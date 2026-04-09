@@ -1,7 +1,9 @@
 package nfapckg
 
+import "sort"
+
 type config struct {
-	state *state
+	state *State
 	pos   int
 	cap   *capture_state
 }
@@ -11,7 +13,6 @@ type capture_state struct {
 	end   map[string]int
 }
 
-// visited: (state, pos) → лучший config
 type state_pos_key struct {
 	state_id int
 	pos      int
@@ -58,6 +59,7 @@ func betterCapture(new_cap, old_cap *capture_state) bool {
 	}
 
 	// собираем все имена групп
+	// чтобы сортнуть для детерминизма
 	names_map := make(map[string]struct{})
 
 	for k := range new_cap.start {
@@ -73,8 +75,7 @@ func betterCapture(new_cap, old_cap *capture_state) bool {
 		names = append(names, k)
 	}
 
-	// можно отсортировать (желательно)
-	// sort.Strings(names)
+	sort.Strings(names)
 
 	for _, name := range names {
 		new_start, new_has_start := new_cap.start[name]
@@ -83,7 +84,6 @@ func betterCapture(new_cap, old_cap *capture_state) bool {
 		new_end, new_has_end := new_cap.end[name]
 		old_end, old_has_end := old_cap.end[name]
 
-		// 1. наличие группы
 		if new_has_start && !old_has_start {
 			return true
 		}
@@ -91,12 +91,10 @@ func betterCapture(new_cap, old_cap *capture_state) bool {
 			return false
 		}
 
-		// если обеих нет — идём дальше
 		if !new_has_start && !old_has_start {
 			continue
 		}
 
-		// 2. более ранний start — лучше
 		if new_start < old_start {
 			return true
 		}
@@ -104,7 +102,6 @@ func betterCapture(new_cap, old_cap *capture_state) bool {
 			return false
 		}
 
-		// 3. длина (если есть end)
 		if new_has_end && old_has_end {
 			new_len := new_end - new_start
 			old_len := old_end - old_start
@@ -117,7 +114,6 @@ func betterCapture(new_cap, old_cap *capture_state) bool {
 			}
 		}
 
-		// если один завершён, другой нет
 		if new_has_end && !old_has_end {
 			return true
 		}
@@ -126,7 +122,6 @@ func betterCapture(new_cap, old_cap *capture_state) bool {
 		}
 	}
 
-	// равны → считаем new не лучше
 	return false
 }
 
@@ -143,7 +138,7 @@ func epsilonClosure(input []config) []config {
 		stack = stack[:len(stack)-1]
 
 		key := state_pos_key{
-			state_id: cur.state.id,
+			state_id: cur.state.Id,
 			pos:      cur.pos,
 		}
 
@@ -158,7 +153,7 @@ func epsilonClosure(input []config) []config {
 		visited[key] = cur
 
 		// идём по ε-переходам
-		for _, tr := range cur.state.epsilon {
+		for _, tr := range cur.state.Epsilon {
 			var new_cap *capture_state
 
 			if tr.cap != nil {
@@ -169,8 +164,8 @@ func epsilonClosure(input []config) []config {
 			}
 
 			next := config{
-				state: tr.to,
-				pos:   cur.pos, // ВАЖНО: pos не меняется
+				state: tr.To,
+				pos:   cur.pos, // ВАЖНО pos не меняется
 				cap:   new_cap,
 			}
 
@@ -190,7 +185,7 @@ func epsilonClosure(input []config) []config {
 func moveLiteral(states []config, symbol string) []config {
 	visited := make(map[state_pos_key]config)
 	for _, cfg := range states {
-		next_state := cfg.state.ntran[symbol]
+		next_state := cfg.state.Ntran[symbol]
 		for _, st := range next_state {
 			new_cfg := config{
 				state: st,
@@ -199,7 +194,7 @@ func moveLiteral(states []config, symbol string) []config {
 			}
 
 			key := state_pos_key{
-				state_id: st.id,
+				state_id: st.Id,
 				pos:      new_cfg.pos,
 			}
 
@@ -221,7 +216,7 @@ func moveLiteral(states []config, symbol string) []config {
 
 func matchNFAImpl(nfa *NFA, input string) []config {
 	start_config := config{
-		nfa.head.start,
+		nfa.Head.Start,
 		0,
 		nil,
 	}
@@ -240,7 +235,7 @@ func (nfa *NFA) matchNFA(input string) bool {
 	configs := matchNFAImpl(nfa, input)
 
 	for _, cfg := range configs {
-		if cfg.state == nfa.head.finish {
+		if cfg.state == nfa.Head.Finish {
 			return true
 		}
 	}
@@ -252,7 +247,7 @@ func (nfa *NFA) matchNFAWithCapture(input string) *capture_state {
 
 	var best *capture_state
 	for _, cfg := range configs {
-		if cfg.state == nfa.head.finish {
+		if cfg.state == nfa.Head.Finish {
 			if best == nil || betterCapture(best, cfg.cap) {
 				best = cfg.cap
 			}
