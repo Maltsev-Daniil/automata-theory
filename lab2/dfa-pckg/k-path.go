@@ -87,7 +87,8 @@ func conc(a, b string) string {
 	return "(" + a + b + ")"
 }
 
-func Kpath(gnfa *GNFA) (res string) {
+func Kpath(dfa *DFA) (res string) {
+	gnfa := fromDfaToGnfa(dfa)
 	states := make([]int, len(gnfa.gstates))
 	for state := range gnfa.gstates {
 		states = append(states, state)

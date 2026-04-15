@@ -30,8 +30,6 @@ type NFA struct {
 }
 
 var state_id int
-var group_order []string
-var name_to_id map[string]int
 
 func GenNewState() *State {
 	s := &State{
@@ -144,19 +142,18 @@ func buildOptional(node NfaNode) NfaNode {
 	}
 }
 
-func buildCapture(node *synttree.Node) NfaNode {
-	child := buildNFA(node.Left)
+func buildCapture(node *synttree.Node,
+	group_order *[]string,
+	name_to_id *map[string]int) NfaNode {
+	child := buildNFA(node.Left,
+		group_order, name_to_id)
 
 	new_s := GenNewState()
 	new_f := GenNewState()
 
-	// чтобы можно было по айди находить
-	if name_to_id == nil {
-		name_to_id = make(map[string]int)
-	}
-	if _, exists := name_to_id[node.Value]; !exists {
-		name_to_id[node.Value] = len(group_order)
-		group_order = append(group_order, node.Value)
+	if _, exists := (*name_to_id)[node.Value]; !exists {
+		(*name_to_id)[node.Value] = len(*group_order)
+		*group_order = append(*group_order, node.Value)
 	}
 
 	new_s.Epsilon = append(new_s.Epsilon, Epsilon_tran{
@@ -178,37 +175,57 @@ func buildCapture(node *synttree.Node) NfaNode {
 	}
 }
 
-func buildNFA(root *synttree.Node) NfaNode {
+func buildNFA(root *synttree.Node,
+	group_order *[]string,
+	name_to_id *map[string]int) NfaNode {
 	switch root.Type_node {
 	case synttree.LITERAL:
 		return buildLiteral(root.Value)
 	case synttree.OP_CONC:
-		left := buildNFA(root.Left)
-		right := buildNFA(root.Right)
+		left := buildNFA(root.Left,
+			group_order,
+			name_to_id)
+		right := buildNFA(root.Right,
+			group_order, name_to_id)
 		return buildConc(left, right)
 	case synttree.OP_OR:
-		left := buildNFA(root.Left)
-		right := buildNFA(root.Right)
+		left := buildNFA(root.Left,
+			group_order, name_to_id)
+		right := buildNFA(root.Right,
+			group_order, name_to_id)
 		return buildOr(left, right)
 	case synttree.OP_KLINI:
-		left := buildNFA(root.Left)
+		left := buildNFA(root.Left,
+			group_order, name_to_id)
 		return buildKlini(left)
 	case synttree.OP_QUESTION:
-		left := buildNFA(root.Left)
+		left := buildNFA(root.Left,
+			group_order, name_to_id)
 		return buildOptional(left)
 	case synttree.CAPTURE_GROUP:
 		// передаем ноду целиком тк нам нужна
 		// информация по группе захвата
-		return buildCapture(root)
+		return buildCapture(root,
+			group_order, name_to_id)
 	default:
 		panic(errors.New("buildNFA: invalid node type"))
 	}
 }
 
 func treeToNFA(tree *synttree.Tree) *NFA {
+	group_order := []string{}
+	name_to_id := make(map[string]int)
 	return &NFA{
-		buildNFA(tree.Root),
+		buildNFA(tree.Root,
+			&group_order,
+			&name_to_id,
+		),
 		group_order,
 		name_to_id,
 	}
+}
+
+func CompileNFA(expr string) *NFA {
+	tree, _ := synttree.StringToTree(expr)
+	return treeToNFA(&tree)
 }

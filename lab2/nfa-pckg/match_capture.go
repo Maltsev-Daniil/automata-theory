@@ -1,6 +1,9 @@
 package nfapckg
 
-import "sort"
+import (
+	"errors"
+	"sort"
+)
 
 type config struct {
 	state *State
@@ -16,6 +19,13 @@ type capture_state struct {
 type state_pos_key struct {
 	state_id int
 	pos      int
+}
+
+type match_capture_res struct {
+	cap         *capture_state
+	name_to_id  map[string]int
+	group_order []string
+	input       string
 }
 
 func cloneCaptureState(cap *capture_state) *capture_state {
@@ -242,7 +252,7 @@ func (nfa *NFA) matchNFA(input string) bool {
 	return false
 }
 
-func (nfa *NFA) matchNFAWithCapture(input string) *capture_state {
+func (nfa *NFA) matchNFAWithCapture(input string) *match_capture_res {
 	configs := matchNFAImpl(nfa, input)
 
 	var best *capture_state
@@ -253,5 +263,49 @@ func (nfa *NFA) matchNFAWithCapture(input string) *capture_state {
 			}
 		}
 	}
-	return best
+	return &match_capture_res{
+		cap:         best,
+		name_to_id:  nfa.name_to_id,
+		group_order: nfa.group_order,
+		input:       input,
+	}
+}
+
+func (match_res *match_capture_res) GroupByName(name string) (string, error) {
+	if match_res == nil {
+		return "", errors.New("GroupByName: no group matched")
+	}
+	st, ok1 := match_res.cap.start[name]
+	fi, ok2 := match_res.cap.end[name]
+
+	if !ok1 || !ok2 {
+		return "", errors.New("GroupByName: capture group not found")
+	}
+
+	return match_res.input[st:fi], nil
+}
+
+func (match_res *match_capture_res) GroupById(id int) (string, error) {
+	if id == 0 {
+		return match_res.input, nil
+	}
+	if match_res == nil {
+		return "", errors.New("GroupById: no group matched")
+	}
+	// сделали сдвиг
+	// 1 --> 0
+	id--
+	if id >= len(match_res.group_order) {
+		return "", errors.New("GroupById: capture group not found")
+	}
+
+	name := match_res.group_order[id]
+	return match_res.GroupByName(name)
+}
+
+// поддержка на лету match по тз
+// так же можно и разбить на этапы
+func MatchOnFly(regex string, input string) bool {
+	nfa := CompileNFA(input)
+	return nfa.matchNFA(input)
 }

@@ -174,9 +174,25 @@ func findState(dstates []set, trans_by_lit set) int {
 
 func addShebang(tree *synttree.Tree) {
 	var far_right *synttree.Node
-	for far_right = tree.Root; far_right.Right != nil; far_right = far_right.Right {
+	for far_right = tree.Root; far_right != nil && far_right.Right != nil; far_right = far_right.Right {
 	}
-	far_right.Right = &synttree.Node{Type_node: synttree.SHEBANG, Value: "#"}
+	// проверяем что уже не добавлен
+	if far_right != nil && far_right.Type_node == synttree.SHEBANG {
+		return
+	}
+
+	// делаем conc
+	old_root := tree.Root
+	shebang := &synttree.Node{Type_node: synttree.SHEBANG, Value: "#"}
+	new_root := &synttree.Node{
+		Type_node: synttree.OP_CONC,
+		Value:     "+",
+		Left:      old_root,
+		Right:     shebang,
+	}
+	old_root.Parent = new_root
+	shebang.Parent = new_root
+	tree.Root = new_root
 }
 
 func treeToDFA(tree *synttree.Tree) *DFA {
@@ -245,10 +261,9 @@ func treeToDFA(tree *synttree.Tree) *DFA {
 
 	// building dead_states
 	dead_id := len(dstates)
-	if dtran[dead_id] == nil {
-		dtran[dead_id] = make(map[string]int)
-	}
-	for state_id := range dstates {
+	dtran[dead_id] = make(map[string]int)
+	dstates = append(dstates, make(set))
+	for state_id := 0; state_id < dead_id; state_id++ {
 		if dtran[state_id] == nil {
 			dtran[state_id] = make(map[string]int)
 		}
@@ -285,4 +300,9 @@ func treeToDFA(tree *synttree.Tree) *DFA {
 		0,
 		accept_states,
 	}
+}
+
+func CompileDFA(expr string) *DFA {
+	tree, _ := synttree.StringToTree(expr)
+	return treeToDFA(&tree)
 }

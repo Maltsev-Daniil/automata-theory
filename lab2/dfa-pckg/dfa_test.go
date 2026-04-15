@@ -129,11 +129,11 @@ func TestTreeToDFA_Linear(t *testing.T) {
 	if _, ok := dfa.alphabet["a"]; !ok {
 		t.Fatalf("alphabet must contain literal %q: %v", "a", dfa.alphabet)
 	}
-	if len(dfa.dstates) != 2 {
-		t.Fatalf("unexpected number of dstates: got %d want %d", len(dfa.dstates), 2)
+	if len(dfa.dstates) != 3 {
+		t.Fatalf("unexpected number of dstates: got %d want %d", len(dfa.dstates), 3)
 	}
 
-	dead_id := len(dfa.dstates)
+	dead_id := len(dfa.dstates) - 1
 
 	if got := dfa.dtran[0]["a"]; got != 1 {
 		t.Fatalf("unexpected transition dtran[0][a]: got %d want %d", got, 1)
@@ -184,7 +184,7 @@ func TestTreeToDFA_Or(t *testing.T) {
 		t.Fatalf("target state for start transitions must be accepting: target=%d accept=%v", next_by_a, dfa.accept_states)
 	}
 
-	dead_id := len(dfa.dstates)
+	dead_id := len(dfa.dstates) - 1
 	if got := dfa.dtran[dead_id]["a"]; got != dead_id {
 		t.Fatalf("unexpected dead transition for a: got %d want %d", got, dead_id)
 	}
