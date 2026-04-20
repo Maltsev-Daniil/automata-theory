@@ -145,6 +145,7 @@ func buildOptional(node NfaNode) NfaNode {
 func buildCapture(node *synttree.Node,
 	group_order *[]string,
 	name_to_id *map[string]int) NfaNode {
+
 	child := buildNFA(node.Left,
 		group_order, name_to_id)
 

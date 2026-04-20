@@ -16,7 +16,6 @@ func TestComplementIsomorphic(t *testing.T) {
 	source := mustCompileDFA(t, "a?")
 	got := Complement(source)
 
-	// Over alphabet {a}: complement of {ε, a} is {a^n | n >= 2}.
 	right := mustCompileDFA(t, "aaa...")
 	if !Isomorphic(got, right) {
 		t.Fatalf("Complement DFA is not isomorphic to expected DFA")

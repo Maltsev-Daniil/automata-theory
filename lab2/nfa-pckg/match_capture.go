@@ -94,6 +94,7 @@ func betterCapture(new_cap, old_cap *capture_state) bool {
 		new_end, new_has_end := new_cap.end[name]
 		old_end, old_has_end := old_cap.end[name]
 
+		// does have group
 		if new_has_start && !old_has_start {
 			return true
 		}
@@ -105,6 +106,7 @@ func betterCapture(new_cap, old_cap *capture_state) bool {
 			continue
 		}
 
+		// is start earlier
 		if new_start < old_start {
 			return true
 		}
@@ -112,6 +114,7 @@ func betterCapture(new_cap, old_cap *capture_state) bool {
 			return false
 		}
 
+		// is longer
 		if new_has_end && old_has_end {
 			new_len := new_end - new_start
 			old_len := old_end - old_start
@@ -124,6 +127,7 @@ func betterCapture(new_cap, old_cap *capture_state) bool {
 			}
 		}
 
+		// does have an end
 		if new_has_end && !old_has_end {
 			return true
 		}
@@ -132,6 +136,7 @@ func betterCapture(new_cap, old_cap *capture_state) bool {
 		}
 	}
 
+	// not better
 	return false
 }
 
@@ -306,6 +311,6 @@ func (match_res *match_capture_res) GroupById(id int) (string, error) {
 // поддержка на лету match по тз
 // так же можно и разбить на этапы
 func MatchOnFly(regex string, input string) bool {
-	nfa := CompileNFA(input)
+	nfa := CompileNFA(regex)
 	return nfa.matchNFA(input)
 }

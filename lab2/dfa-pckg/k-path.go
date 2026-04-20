@@ -22,12 +22,15 @@ func fromDfaToGnfa(dfa *DFA) *GNFA {
 		max_id = max(max_id, i)
 	}
 
+	// создаем единственные новые
+	// нач и кон состояния
 	start_state := max_id + 1
 	gstates[start_state] = struct{}{}
 
 	finish_state := max_id + 2
 	gstates[finish_state] = struct{}{}
 
+	// init
 	for i := range gstates {
 		gtrans[i] = make(map[int]string)
 		for j := range gstates {
@@ -89,7 +92,7 @@ func conc(a, b string) string {
 
 func Kpath(dfa *DFA) (res string) {
 	gnfa := fromDfaToGnfa(dfa)
-	states := make([]int, len(gnfa.gstates))
+	states := make([]int, 0, len(gnfa.gstates))
 	for state := range gnfa.gstates {
 		states = append(states, state)
 	}

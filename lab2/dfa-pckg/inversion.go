@@ -18,6 +18,7 @@ func DfaToNfaNReverse(dfa *DFA) *nfapckg.NFA {
 	for state := range dfa.dstates {
 		for lit := range dfa.alphabet {
 			if next_state, ok := dfa.dtran[state][lit]; ok {
+				// в обратном порядке добавляем
 				dfa_to_nfa[next_state].Ntran[lit] = append(
 					dfa_to_nfa[next_state].Ntran[lit],
 					dfa_to_nfa[state])
